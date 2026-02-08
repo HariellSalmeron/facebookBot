@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, FacebookPage } from '../lib/supabase';
-import { AlertCircle, Loader, Trash2, Plus } from 'lucide-react';
+import { AlertCircle, Loader, Trash2, Plus, PlusCircle } from 'lucide-react';
+import { PageCreationModal } from './PageCreationModal';
 
 interface PagesDashboardProps {
   onNavigate?: (page: 'dashboard' | 'scheduler') => void;
@@ -14,6 +15,7 @@ export function PagesDashboard({ onNavigate }: PagesDashboardProps) {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -119,6 +121,10 @@ export function PagesDashboard({ onNavigate }: PagesDashboardProps) {
     }
   }
 
+  async function handlePageCreated() {
+    await syncFacebookPages();
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -136,23 +142,32 @@ export function PagesDashboard({ onNavigate }: PagesDashboardProps) {
             {pages.length} {pages.length === 1 ? 'page' : 'pages'} connected
           </p>
         </div>
-        <button
-          onClick={syncFacebookPages}
-          disabled={syncing}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {syncing ? (
-            <>
-              <Loader size={18} className="animate-spin" />
-              Syncing...
-            </>
-          ) : (
-            <>
-              <Plus size={18} />
-              Sync Pages
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <PlusCircle size={18} />
+            Create Page
+          </button>
+          <button
+            onClick={syncFacebookPages}
+            disabled={syncing}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? (
+              <>
+                <Loader size={18} className="animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Plus size={18} />
+                Sync Pages
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -179,25 +194,34 @@ export function PagesDashboard({ onNavigate }: PagesDashboardProps) {
           </svg>
           <p className="text-gray-600 text-lg mb-4">No pages connected yet</p>
           <p className="text-gray-500 mb-6">
-            Connect your Facebook pages to start managing and scheduling posts
+            Create a new Facebook page or sync your existing pages
           </p>
-          <button
-            onClick={syncFacebookPages}
-            disabled={syncing}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {syncing ? (
-              <>
-                <Loader size={18} className="animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <Plus size={18} />
-                Connect First Page
-              </>
-            )}
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors"
+            >
+              <PlusCircle size={18} />
+              Create New Page
+            </button>
+            <button
+              onClick={syncFacebookPages}
+              disabled={syncing}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {syncing ? (
+                <>
+                  <Loader size={18} className="animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Plus size={18} />
+                  Sync Existing Pages
+                </>
+              )}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -240,6 +264,13 @@ export function PagesDashboard({ onNavigate }: PagesDashboardProps) {
           ))}
         </div>
       )}
+
+      <PageCreationModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onPageCreated={handlePageCreated}
+        accessToken={user?.facebook_access_token || ''}
+      />
     </div>
   );
 }

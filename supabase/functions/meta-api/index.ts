@@ -105,6 +105,39 @@ async function schedulePost(
   }
 }
 
+async function createPage(
+  accessToken: string,
+  name: string,
+  category: string,
+  about?: string
+) {
+  try {
+    const params: Record<string, string> = {
+      name,
+      category_enum: category,
+      access_token: accessToken,
+    };
+
+    if (about) {
+      params.about = about;
+    }
+
+    const response = await fetch(`${META_GRAPH_URL}/me/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params).toString(),
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+    return data;
+  } catch (error) {
+    throw new Error(`Page creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -164,6 +197,20 @@ Deno.serve(async (req: Request) => {
           pageId as string,
           message as string,
           scheduledTime as number
+        );
+        break;
+      }
+
+      case "create_page": {
+        const { access_token, name, category, about } = body;
+        if (!access_token || !name || !category) {
+          throw new Error("Missing required parameters: access_token, name, category");
+        }
+        result = await createPage(
+          access_token as string,
+          name as string,
+          category as string,
+          about as string | undefined
         );
         break;
       }
