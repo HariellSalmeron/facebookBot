@@ -3,12 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { supabase, FacebookPage } from '../lib/supabase';
 import { AlertCircle, Loader, Trash2, Plus } from 'lucide-react';
 
-export function PagesDashboard() {
+interface PagesDashboardProps {
+  onNavigate?: (page: 'dashboard' | 'scheduler') => void;
+}
+
+export function PagesDashboard({ onNavigate }: PagesDashboardProps) {
   const { user } = useAuth();
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -52,6 +57,68 @@ export function PagesDashboard() {
     }
   }
 
+  async function syncFacebookPages() {
+    if (!user?.facebook_access_token) {
+      setError('Facebook account not connected');
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setError('');
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/meta-api`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'get_pages',
+          access_token: user.facebook_access_token,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch pages from Facebook');
+      }
+
+      const facebookPages = data.data || [];
+
+      for (const fbPage of facebookPages) {
+        const { error: upsertError } = await supabase
+          .from('facebook_pages')
+          .upsert(
+            {
+              user_id: user.id,
+              page_id: fbPage.id,
+              page_name: fbPage.name,
+              page_access_token: user.facebook_access_token,
+              page_picture_url: fbPage.picture?.data?.url || null,
+              connected_at: new Date().toISOString(),
+            },
+            {
+              onConflict: 'user_id,page_id',
+            }
+          );
+
+        if (upsertError) throw upsertError;
+      }
+
+      await fetchPages();
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync pages');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -69,9 +136,22 @@ export function PagesDashboard() {
             {pages.length} {pages.length === 1 ? 'page' : 'pages'} connected
           </p>
         </div>
-        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
-          <Plus size={18} />
-          Add Page
+        <button
+          onClick={syncFacebookPages}
+          disabled={syncing}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {syncing ? (
+            <>
+              <Loader size={18} className="animate-spin" />
+              Syncing...
+            </>
+          ) : (
+            <>
+              <Plus size={18} />
+              Sync Pages
+            </>
+          )}
         </button>
       </div>
 
@@ -101,9 +181,22 @@ export function PagesDashboard() {
           <p className="text-gray-500 mb-6">
             Connect your Facebook pages to start managing and scheduling posts
           </p>
-          <button className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
-            <Plus size={18} />
-            Connect First Page
+          <button
+            onClick={syncFacebookPages}
+            disabled={syncing}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? (
+              <>
+                <Loader size={18} className="animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Plus size={18} />
+                Connect First Page
+              </>
+            )}
           </button>
         </div>
       ) : (
@@ -124,7 +217,10 @@ export function PagesDashboard() {
                 <h3 className="font-bold text-gray-900 mb-1">{page.page_name}</h3>
                 <p className="text-sm text-gray-600 mb-4">ID: {page.page_id}</p>
                 <div className="flex gap-2">
-                  <button className="flex-1 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded transition-colors text-sm">
+                  <button
+                    onClick={() => onNavigate?.('scheduler')}
+                    className="flex-1 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium rounded transition-colors text-sm"
+                  >
                     Schedule Post
                   </button>
                   <button

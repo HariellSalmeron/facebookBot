@@ -4,7 +4,6 @@ import { Loader, AlertCircle } from 'lucide-react';
 
 export function FacebookCallback() {
   const { updateFacebookToken } = useAuth();
-  const navigate = useNavigate();
   const [error, setError] = useState('');
   const [processing, setProcessing] = useState(true);
 

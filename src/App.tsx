@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { Navigation } from './components/Navigation';
 import { AuthForm } from './components/AuthForm';
 import { FacebookLoginButton } from './components/FacebookLoginButton';
+import { FacebookCallback } from './components/FacebookCallback';
 import { PagesDashboard } from './components/PagesDashboard';
 import { PostScheduler } from './components/PostScheduler';
 import { Loader } from 'lucide-react';
@@ -10,6 +11,15 @@ import { Loader } from 'lucide-react';
 function App() {
   const { session, user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'scheduler'>('dashboard');
+  const [isCallback, setIsCallback] = useState(false);
+
+  useEffect(() => {
+    setIsCallback(window.location.pathname === '/auth/facebook/callback');
+  }, []);
+
+  if (isCallback) {
+    return <FacebookCallback />;
+  }
 
   if (loading) {
     return (
@@ -71,7 +81,7 @@ function App() {
             <FacebookLoginButton />
           </div>
         ) : currentPage === 'dashboard' ? (
-          <PagesDashboard />
+          <PagesDashboard onNavigate={setCurrentPage} />
         ) : (
           <PostScheduler />
         )}
